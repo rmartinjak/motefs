@@ -265,36 +265,44 @@ static int op_write(const char *path, const char *buf, size_t size,
     int n, op, result, res = 0;
     uint8_t data[MFS_DATA_SIZE];
 
+    unsigned i;
+    char line[MFS_DATA_SIZE];
+
     n = get_node(path);
 
     if (n == -1)
         return -ENOENT;
 
+    if (size >= MFS_DATA_SIZE)
+        size = MFS_DATA_SIZE - 1;
+
+    for (i = 0; i < size && buf[i] != '\n'; i++)
+        line[i] = buf[i];
+    line[i] = '\0';
+    size = i;
+
     if (nodes[n].type == MFS_BOOL)
     {
 #define MIN(a, b) (a < b) ? a : b
-        if (!strncmp(buf, "true", MIN(sizeof "true", size)))
+        if (!strncmp(line, "true", MIN(sizeof "true", size)))
             data[0] = 1;
-        else if (!strncmp(buf, "false", MIN(sizeof "false", size)))
+        else if (!strncmp(line, "false", MIN(sizeof "false", size)))
             data[0] = 0;
 #undef MIN
         else
-            data[0] = ! !atoi(buf);
+            data[0] = atoi(line) != 0;
         size = 1;
     }
     else if (nodes[n].type == MFS_INT)
     {
-        int64_t val = atoll(buf);
+        int64_t val = atoll(line);
         size = pack(data, "l", val);
     }
     else if (nodes[n].type == MFS_STR)
     {
         unsigned i;
-        if (size >= MFS_DATA_SIZE)
-            size = MFS_DATA_SIZE - 1;
-
         for (i = 0; i < size; i++)
-            data[i] = buf[i];
+            data[i] = line[i];
         data[size] = '\0';
     }
     res = size;
