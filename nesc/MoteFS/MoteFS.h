@@ -22,7 +22,8 @@ enum motefs_op
     MFS_READ,
     MFS_WRITE,
     MFS_READWRITE,
-    MFS_LIST
+    MFS_NODECOUNT,
+    MFS_LIST,
 };
 
 struct motefs_node

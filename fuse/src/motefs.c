@@ -10,15 +10,15 @@
 #include <fuse.h>
 #include <fuse_opt.h>
 #include <sys/stat.h>
-
-#include "serialsource.h"
+#include <pthread.h>
 
 #include "pack.h"
+#include "serial.h"
 #include "mfsmsg.h"
 #include "mfsconst.h"
 
 
-static uint8_t node_count = 0;
+static int node_count = 0;
 static struct motefs_node
 {
     char name[MFS_DATA_SIZE];
@@ -29,32 +29,63 @@ static struct motefs_node
 #define MFS_ISWRITE(node) ((node).type == MFS_WRITE || (node).type == MFS_READWRITE)
 
 
-static char serial_device[1024];
-static bool serial_device_set = false;
-static int serial_baudrate;
+static char device[1024];
+static unsigned baudrate;
 
-static serial_source serial_src;
-static int serial_send(int node, int op, uint8_t *data, int len)
+
+static int fetch_nodecount(int *count)
 {
-    int i;
-    unsigned char buf[MFSMSG_SIZE];
+    int op, result, res;
 
-    tmsg_t *msg = new_tmsg(buf, sizeof buf);
+    serial_lock();
 
-    if (len > MFS_DATA_SIZE)
-        len = MFS_DATA_SIZE;
+    res = serial_send(0, MFS_NODECOUNT, NULL, 0);
+    if (res == -1)
+        goto ret;
 
-    mfsmsg_node_set(msg, node);
-    mfsmsg_op_set(msg, op);
+    res = serial_receive(NULL, &op, &result, NULL, 0);
+    if (res == -1 || op != MFS_NODECOUNT)
+        goto ret;
 
-    for (i = 0; i < len; i++)
-        mfsmsg_data_set(msg, i, data[i]);
+    *count = result;
+
+  ret:
+    serial_unlock();
+    if (res)
+        return -1;
+    return 0;
+}
+
+static int fetch_nodelist(struct motefs_node *nodes)
+{
+    int n, i, k, op, result, res;
+    uint8_t buf[MFS_DATA_SIZE];
+
+    serial_lock();
+
+    res = serial_send(0, MFS_LIST, NULL, 0);
+    for (i = 0; i < node_count; i++)
+    {
+        res = serial_receive(&n, &op, &result, buf, sizeof buf);
+        if (res == -1 || op != MFS_LIST)
+            goto ret;
+
+        nodes[n].op = op;
+        nodes[n].type = result;
+        for (k = 0; k < MFS_DATA_SIZE; k++)
+            nodes[n].name[k] = buf[k];
+    }
+
+  ret:
+    serial_unlock();
+    if (res)
+        return -1;
     return 0;
 }
 
 static int get_node(const char *name)
 {
-    unsigned i;
+    int i;
     if (*name == '/')
         name++;
 
@@ -65,25 +96,6 @@ static int get_node(const char *name)
         if (!strcmp(name, nodes[i].name))
             return i;
     return -1;
-}
-
-
-static char *msgs[] = {
-    "unknown_packet_type",
-    "ack_timeout",
-    "sync",
-    "too_long",
-    "too_short",
-    "bad_sync",
-    "bad_crc",
-    "closed",
-    "no_memory",
-    "unix_error"
-};
-
-void stderr_msg(serial_source_msg problem)
-{
-    fprintf(stderr, "Note: %s\n", msgs[problem]);
 }
 
 
@@ -151,7 +163,7 @@ static int op_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
     (void) offset;
     (void) fi;
 
-    unsigned i;
+    int i;
 
     if (strcmp(path, "/"))
         return -ENOENT;
@@ -190,7 +202,7 @@ static int op_read(const char *path, char *buf, size_t size, off_t offset,
     (void) fi;
     (void) offset;
 
-    int n, res;
+    int n, i, op, len, res;
     uint8_t data[MFS_DATA_SIZE];
 
     n = get_node(path);
@@ -201,10 +213,20 @@ static int op_read(const char *path, char *buf, size_t size, off_t offset,
     if (size < MFSMSG_SIZE)
         return -EIO;
 
-    res = serial_send(n, MFS_READ, data, sizeof data);
+    serial_lock();
 
-    if (res == -1)
-        return -EIO;
+    if (serial_send(n, MFS_READ, NULL, 0))
+    {
+        res = -EIO;
+        goto ret;
+    }
+
+    res = serial_receive(NULL, &op, &len, data, sizeof data);
+    if (res == -1 || op != MFS_READ)
+    {
+        res = -EIO;
+        goto ret;
+    }
 
     switch (nodes[n].type)
     {
@@ -221,11 +243,16 @@ static int op_read(const char *path, char *buf, size_t size, off_t offset,
             break;
 
         case MFS_STR:
-            memcpy(buf, data, res - 1);
-            buf[res - 1] = '\0';
+            for (i = 0; i < MFS_DATA_SIZE - 1; i++)
+                buf[i] = data[i];
+            buf[i] = '\0';
             break;
     }
-    res = strlen(buf);
+
+    res = len;
+
+  ret:
+    serial_unlock();
     return res;
 }
 
@@ -235,7 +262,7 @@ static int op_write(const char *path, const char *buf, size_t size,
     (void) fi;
     (void) offset;
 
-    int n, res = 0;
+    int n, op, result, res = 0;
     uint8_t data[MFS_DATA_SIZE];
 
     n = get_node(path);
@@ -270,11 +297,25 @@ static int op_write(const char *path, const char *buf, size_t size,
             data[i] = buf[i];
         data[size] = '\0';
     }
+    res = size;
 
-    res = serial_send(n, MFS_WRITE, data, size);
-    if (res == -1)
-        return -EIO;
-    return size;
+    serial_lock();
+    if (serial_send(n, MFS_WRITE, data, size))
+    {
+        res = -EIO;
+        goto ret;
+    }
+
+    res = serial_receive(NULL, &op, &result, NULL, 0);
+    if (res == -1 || op != MFS_WRITE)
+    {
+        res = -EIO;
+        goto ret;
+    }
+
+  ret:
+    serial_unlock();
+    return res;
 }
 
 static struct fuse_operations motefs_ops = {
@@ -301,21 +342,20 @@ static int motefs_opt_proc(void *data, const char *arg, int key,
 {
     (void) data;
     (void) outargs;
+    static bool device_is_set = false;
 
     switch (key)
     {
         case FUSE_OPT_KEY_NONOPT:
             /* serial device is already set, pass the arg on to fuse */
-            if (serial_device_set)
+            if (device_is_set)
                 return 1;
-            puts(arg);
-            strncpy(serial_device, arg, sizeof serial_device - 1);
-            serial_device_set = true;
+            strncpy(device, arg, sizeof device - 1);
+            device_is_set = true;
             return 0;
 
         case MOTEFS_OPT_BAUDRATE:
-            if (!strchr(arg, '=') ||
-                !(serial_baudrate = atoi(strchr(arg, '=') + 1)))
+            if (!strchr(arg, '=') || !(baudrate = atoi(strchr(arg, '=') + 1)))
             {
                 fprintf(stderr, "invalid baud rate: %s\n", arg);
                 return -1;
@@ -335,11 +375,15 @@ int main(int argc, char **argv)
     if (fuse_opt_parse(&args, NULL, motefs_opts, motefs_opt_proc) == -1)
         return EXIT_FAILURE;
 
-    serial_src =
-        open_serial_source(serial_device, serial_baudrate, 0, stderr_msg);
-    if (!serial_src)
+    if (serial_connect(device, baudrate))
     {
-        fprintf(stderr, "can't open device %s\n", serial_device);
+        fprintf(stderr, "can't open device %s:%u\n", device, baudrate);
+        return EXIT_FAILURE;
+    }
+
+    if (fetch_nodecount(&node_count) || fetch_nodelist(nodes))
+    {
+        fprintf(stderr, "can't get node list from Mote\n");
         return EXIT_FAILURE;
     }
 

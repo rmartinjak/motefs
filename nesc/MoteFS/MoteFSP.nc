@@ -150,7 +150,6 @@ implementation
         uint8_t i = 0;
 
         reply.op = MFS_LIST;
-        reply.result = mfs_nodecount;
 
 #ifdef LEDS
         call Leds.led0Toggle();
@@ -159,6 +158,7 @@ implementation
         {
             strtonx(reply.data, mfs_nodes[i].name);
             reply.node = i;
+            reply.result = mfs_nodes[i].type;
             enqueueMsg();
         }
     }
@@ -179,6 +179,13 @@ implementation
         if (m->op == MFS_LIST)
         {
             post listNodes();
+            return msg;
+        }
+        else if (m->op == MFS_NODECOUNT)
+        {
+            reply.op = MFS_NODECOUNT;
+            reply.result = mfs_nodecount;
+            enqueueMsg();
             return msg;
         }
 #ifdef LEDS

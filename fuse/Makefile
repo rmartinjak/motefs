@@ -20,7 +20,7 @@ OBJDIR = obj
 
 TARGETS = motefs test
 
-_OBJ = mfsmsg
+_OBJ = mfsmsg serial
 OBJ = $(addprefix $(OBJDIR)/,$(addsuffix .o,$(_OBJ)))
 
 
@@ -34,6 +34,7 @@ MFSCONST = MFS_BOOL \
 		   MFS_WRITE \
 		   MFS_READWRITE \
 		   MFS_LIST \
+		   MFS_NODECOUNT \
 		   MFSMSG_BUFSZ
 
 
@@ -60,5 +61,7 @@ $(TARGETS) : % : $(SRCDIR)/%.c $(OBJ)
 
 
 clean :
+	rm -f $(SRCDIR)/mfsmsg.c $(SRCDIR)/mfsmsg.h
+	rm -f $(SRCDIR)/mfsconst.h
 	rm -rf $(OBJDIR)
 	rm -f $(TARGETS)
