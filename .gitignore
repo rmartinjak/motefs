@@ -15,3 +15,8 @@
 *.exe
 *.out
 *.app
+
+# GNU indent backup files
+*.nc~
+*.c~
+*.h~
