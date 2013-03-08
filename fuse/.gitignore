@@ -1,0 +1,4 @@
+tos/*.h
+src/mfsmsg.[ch]
+src/mfsconst.h
+motefs

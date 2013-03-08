@@ -1,0 +1,7 @@
+this directory should contain:
+
+- libmote.a
+- message.h
+- serialsource.h
+
+from $TOSROOT/support/sdk/c/sf/
