@@ -3,5 +3,6 @@ this directory should contain:
 - libmote.a
 - message.h
 - serialsource.h
+- serialpacket.h
 
 from $TOSROOT/support/sdk/c/sf/
