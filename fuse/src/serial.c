@@ -8,6 +8,8 @@
 #include "mfsmsg.h"
 #include "mfsconst.h"
 #include "serialsource.h"
+#include "serialpacket.h"
+
 
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -71,15 +73,22 @@ void serial_unlock(void)
 
 int serial_send(int node, int op, const uint8_t *data, int len)
 {
-    uint8_t buf[MFSMSG_SIZE];
+    uint8_t buf[1 + SPACKET_SIZE + MFSMSG_SIZE];
 
-    tmsg_t *msg = new_tmsg(buf, sizeof buf);
+    tmsg_t *spacket_header, *msg;
+
+    buf[0] = 0;
+    spacket_header = new_tmsg(buf + 1, SPACKET_SIZE);
+    spacket_header_dest_set(spacket_header, 0xffff);
+    spacket_header_length_set(spacket_header, MFSMSG_SIZE);
+    spacket_header_type_set(spacket_header, MFSMSG_AM_TYPE);
+
+    msg = new_tmsg(buf + 1 + SPACKET_SIZE, MFSMSG_SIZE);
+    mfsmsg_node_set(msg, node);
+    mfsmsg_op_set(msg, op);
 
     if (len > MFS_DATA_SIZE)
         len = MFS_DATA_SIZE;
-
-    mfsmsg_node_set(msg, node);
-    mfsmsg_op_set(msg, op);
     set_data(msg, data, len);
 
     return write_serial_packet(serial_src, buf, sizeof buf);
@@ -90,7 +99,7 @@ int serial_receive(int *node, int *op, int *result, uint8_t *data, int len)
     uint8_t buf[MFSMSG_SIZE];
     tmsg_t *msg;
 
-    const unsigned char *packet;
+    unsigned char *packet;
     int packet_len;
 
     packet = read_serial_packet(serial_src, &packet_len);
@@ -98,13 +107,17 @@ int serial_receive(int *node, int *op, int *result, uint8_t *data, int len)
     if (!packet)
         return -1;
 
+    /* skip the header */
+    packet += 1 + SPACKET_SIZE;
+    packet_len -= 1 + SPACKET_SIZE;
+
     if (packet_len > MFSMSG_SIZE)
     {
         fprintf(stderr, "packet too big: %d\n", len);
         packet_len = MFSMSG_SIZE;
     }
-    memcpy(buf, packet, len);
-    msg = new_tmsg(buf, len);
+
+    msg = new_tmsg(buf, MFSMSG_SIZE);
 
     if (node)
         *node = mfsmsg_node_get(msg);
@@ -117,5 +130,7 @@ int serial_receive(int *node, int *op, int *result, uint8_t *data, int len)
         len = packet_len;
 
     get_data(msg, data, len);
+
+    free(packet);
     return len;
 }
