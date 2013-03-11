@@ -224,12 +224,12 @@ implementation
             case MFS_STR:
                 if (m->op == MFS_OP_READ)
                 {
-                    signal MoteFS.readStr(m->node, node->name, buf_str);
+                    signal MoteFS.readString(m->node, node->name, buf_str);
                 }
                 else
                 {
                     nxtostr(buf_str, m->data);
-                    signal MoteFS.writeStr(m->node, node->name, buf_str);
+                    signal MoteFS.writeString(m->node, node->name, buf_str);
                 }
         }
         return msg;

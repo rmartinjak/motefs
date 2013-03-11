@@ -6,11 +6,11 @@ interface MoteFS
 
     event void readBool(uint8_t node, const char *name, bool * val);
     event void readInt(uint8_t node, const char *name, int64_t *val);
-    event void readStr(uint8_t node, const char *name, char val[MFS_DATA_SIZE]);
+    event void readString(uint8_t node, const char *name, char val[MFS_DATA_SIZE]);
     command void readDone(error_t err);
 
     event void writeBool(uint8_t node, const char *name, bool val);
     event void writeInt(uint8_t node, const char *name, int64_t val);
-    event void writeStr(uint8_t node, const char *name, char val[MFS_DATA_SIZE]);
+    event void writeString(uint8_t node, const char *name, char val[MFS_DATA_SIZE]);
     command void writeDone(error_t err);
 }

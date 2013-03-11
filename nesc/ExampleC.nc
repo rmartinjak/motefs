@@ -100,7 +100,7 @@ implementation
         call MoteFS.readDone(res);
     }
 
-    event void MoteFS.readStr(uint8_t node, const char *name, char val[MFS_DATA_SIZE])
+    event void MoteFS.readString(uint8_t node, const char *name, char val[MFS_DATA_SIZE])
     {
         error_t res = SUCCESS;
 
@@ -169,7 +169,7 @@ implementation
         call MoteFS.writeDone(res);
     }
 
-    event void MoteFS.writeStr(uint8_t node, const char *name, char val[MFS_DATA_SIZE])
+    event void MoteFS.writeString(uint8_t node, const char *name, char val[MFS_DATA_SIZE])
     {
         error_t res = SUCCESS;
 
