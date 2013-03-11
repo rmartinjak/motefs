@@ -2,7 +2,7 @@
 
 interface MoteFS
 {
-    command void init(struct motefs_node *nodes, uint8_t count);
+    command void real_setNodes(struct motefs_node *nodes, uint8_t count);
 
     event void readBool(const char *name, bool * val);
     event void readInt(const char *name, int64_t *val);

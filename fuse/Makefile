@@ -1,5 +1,6 @@
 include ../Makefile.include
 
+#CFLAGS += -DDEBUG
 CFLAGS += -g
 CFLAGS += -Wall -Wextra
 
@@ -27,15 +28,17 @@ OBJ = $(addprefix $(OBJDIR)/,$(addsuffix .o,$(_OBJ)))
 MOTEFS_H = ../nesc/MoteFS/MoteFS.h
 MFSMSG_STRUCT = motefs_msg
 MFSMSG_PREFIX = mfsmsg
-MFSCONST = MFS_BOOL \
-		   MFS_INT \
-		   MFS_STR \
-		   MFS_READ \
-		   MFS_WRITE \
-		   MFS_READWRITE \
-		   MFS_LIST \
-		   MFS_NODECOUNT \
-		   MFSMSG_BUFSZ
+MFSCONST =	MFS_RDONLY \
+			MFS_WRONLY \
+			MFS_RDWR \
+			MFS_BOOL \
+			MFS_INT \
+			MFS_STR \
+			MFS_OP_READ \
+			MFS_OP_WRITE \
+			MFS_OP_NODELIST \
+			MFS_OP_NODECOUNT \
+			MFSMSG_BUFSZ
 
 
 default : motefs

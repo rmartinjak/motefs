@@ -3,17 +3,39 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
+#include <ctype.h>
 #include <pthread.h>
 
 #include "mfsmsg.h"
 #include "mfsconst.h"
+#include "sfsource.h"
 #include "serialsource.h"
 #include "serialpacket.h"
 
 
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
-static serial_source serial_src;
+static enum { SRC_DEVICE, SRC_SF } src_type;
+static serial_source src_dev;
+static int src_fd;
+
+#ifdef DEBUG
+static void debug_packet(uint8_t *packet)
+{
+    unsigned i;
+    for (i = 0; i < 1 + SPACKET_SIZE + MFSMSG_SIZE; i++)
+    {
+        if (isprint(packet[i]))
+            fprintf(stderr, "%2c ", packet[i]);
+        else
+            fprintf(stderr, "%02x ", packet[i]);
+    }
+    fprintf(stderr, "\n");
+}
+#define DEBUG_PACKET(p) debug_packet(p)
+#else
+#define DEBUG_PACKET(p)
+#endif
 
 static char *msgs[] = {
     "unknown_packet_type",
@@ -30,7 +52,8 @@ static char *msgs[] = {
 
 static void stderr_msg(serial_source_msg problem)
 {
-    fprintf(stderr, "Note: %s\n", msgs[problem]);
+    if (problem != 2)
+        fprintf(stderr, "Note: %s\n", msgs[problem]);
 }
 
 static void set_data(tmsg_t *msg, const uint8_t *data, int len)
@@ -51,13 +74,28 @@ static void get_data(tmsg_t *msg, uint8_t *data, int len)
         data[i] = mfsmsg_data_get(msg, i);
 }
 
-
-int serial_connect(const char *dev, unsigned rate)
+int serial_connect_dev(const char *dev, unsigned rate)
 {
-    serial_src = open_serial_source(dev, rate, 0, stderr_msg);
-
-    if (!serial_src)
+    src_dev = open_serial_source(dev, rate, 0, stderr_msg);
+    if (!src_dev)
+    {
+        fprintf(stderr, "can't open device %s:%u\n", dev, rate);
         return -1;
+    }
+    src_type = SRC_DEVICE;
+    return 0;
+}
+
+int serial_connect_sf(const char *host, unsigned port)
+{
+    src_fd = open_sf_source(host, port);
+    if (src_fd < 0)
+    {
+        fprintf(stderr, "can't connect to serial forwarder %s:%u\n",
+                host, port);
+        return -1;
+    }
+    src_type = SRC_SF;
     return 0;
 }
 
@@ -74,6 +112,7 @@ void serial_unlock(void)
 int serial_send(int node, int op, const uint8_t *data, int len)
 {
     uint8_t buf[1 + SPACKET_SIZE + MFSMSG_SIZE];
+    memset(buf, 0, sizeof buf);
 
     tmsg_t *spacket_header, *msg;
 
@@ -91,24 +130,31 @@ int serial_send(int node, int op, const uint8_t *data, int len)
         len = MFS_DATA_SIZE;
     set_data(msg, data, len);
 
-    return write_serial_packet(serial_src, buf, sizeof buf);
+    DEBUG_PACKET(buf);
+
+    return (src_type == SRC_DEVICE) ?
+            write_serial_packet(src_dev, buf, sizeof buf) :
+            write_sf_packet(src_fd, buf, sizeof buf);
 }
 
 int serial_receive(int *node, int *op, int *result, uint8_t *data, int len)
 {
-    uint8_t buf[MFSMSG_SIZE];
+    uint8_t *buf;
     tmsg_t *msg;
 
     unsigned char *packet;
     int packet_len;
 
-    packet = read_serial_packet(serial_src, &packet_len);
+    packet = (src_type == SRC_DEVICE) ?
+        read_serial_packet(src_dev, &packet_len) :
+        read_sf_packet(src_fd, &packet_len);
 
     if (!packet)
         return -1;
+    DEBUG_PACKET(packet);
 
     /* skip the header */
-    packet += 1 + SPACKET_SIZE;
+    buf = packet + 1 + SPACKET_SIZE;
     packet_len -= 1 + SPACKET_SIZE;
 
     if (packet_len > MFSMSG_SIZE)

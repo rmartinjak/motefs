@@ -27,9 +27,7 @@ generic module MoteFSP(am_addr_t msgdest)
         interface AMSend as Send;
         interface Receive;
         interface Queue<nx_struct motefs_msg> as MsgQueue;
-#ifdef LEDS
         interface Leds;
-#endif
     }
 }
 
@@ -45,8 +43,7 @@ implementation
     message_t pkt;
     nx_struct motefs_msg reply;
 
-    enum motefs_type current_type;
-    char current_name[MFS_DATA_SIZE];
+    uint8_t current_node, current_type;
 
     bool buf_bool;
     int64_t buf_int;
@@ -84,9 +81,6 @@ implementation
 
         if (call Send.send(msgdest, &pkt, sizeof *outmsg) == SUCCESS)
         {
-#ifdef LEDS
-            call Leds.led1Toggle();
-#endif
         }
         else
         {
@@ -103,11 +97,13 @@ implementation
             call MsgQueue.enqueue(*payload);
         }
 
+        call Leds.led1Toggle();
         post sendMsg();
     }
 
 
-    command void MoteFS.init(struct motefs_node *nodes, uint8_t count)
+    command void MoteFS.real_setNodes(struct motefs_node *nodes,
+                                      uint8_t count)
     {
         mfs_nodes = nodes;
         mfs_nodecount = count;
@@ -116,6 +112,7 @@ implementation
 
     command void MoteFS.readDone(error_t error)
     {
+        memset(reply.data, 0, sizeof reply.data);
         switch (current_type)
         {
             case MFS_BOOL:
@@ -131,7 +128,8 @@ implementation
                 break;
         }
 
-        reply.op = MFS_READ;
+        reply.node = current_node;
+        reply.op = MFS_OP_READ;
         reply.result = (error == SUCCESS);
 
         enqueueMsg();
@@ -139,7 +137,9 @@ implementation
 
     command void MoteFS.writeDone(error_t error)
     {
-        reply.op = MFS_WRITE;
+        memset(reply.data, 0, sizeof reply.data);
+        reply.node = current_node;
+        reply.op = MFS_OP_WRITE;
         reply.result = (error == SUCCESS);
         enqueueMsg();
     }
@@ -148,16 +148,12 @@ implementation
     task void listNodes(void)
     {
         uint8_t i = 0;
-
-        reply.op = MFS_LIST;
-
-#ifdef LEDS
-        call Leds.led0Toggle();
-#endif
-        for (i = 0; mfs_nodecount; i++)
+        for (i = 0; i < mfs_nodecount; i++)
         {
+            memset(reply.data, 0, sizeof reply.data);
             strtonx(reply.data, mfs_nodes[i].name);
             reply.node = i;
+            reply.op = MFS_OP_NODELIST;
             reply.result = mfs_nodes[i].type;
             enqueueMsg();
         }
@@ -174,66 +170,66 @@ implementation
         {
             return msg;
         }
+        call Leds.led2Toggle();
 
         m = payload;
-        if (m->op == MFS_LIST)
+        if (m->op == MFS_OP_NODELIST)
         {
             post listNodes();
             return msg;
         }
-        else if (m->op == MFS_NODECOUNT)
+        else if (m->op == MFS_OP_NODECOUNT)
         {
-            reply.op = MFS_NODECOUNT;
+            memset(reply.data, 0, sizeof reply.data);
+            reply.node = -1;
+            reply.op = MFS_OP_NODECOUNT;
             reply.result = mfs_nodecount;
             enqueueMsg();
             return msg;
         }
-#ifdef LEDS
-        call Leds.led2Toggle();
-#endif
 
         node = &mfs_nodes[m->node];
 
-        current_type = node->type;
-        strcpy(current_name, node->name);
+        current_node = m->node;
+        current_type = MFS_TYPE(node->type);
 
-        switch (node->type)
+        switch (current_type)
         {
             case MFS_BOOL:
-                if (m->op == MFS_READ)
+                if (m->op == MFS_OP_READ)
                 {
-                    signal MoteFS.readBool(current_name, &buf_bool);
+                    signal MoteFS.readBool(node->name, &buf_bool);
                 }
                 else
                 {
-                    nx_uint8_t val;
-                    val = unpack(m->data, "b", &val);
-                    signal MoteFS.writeBool(current_name, val);
+                    uint8_t val;
+                    unpack(m->data, "b", &val);
+                    signal MoteFS.writeBool(node->name, val);
                 }
                 break;
 
             case MFS_INT:
-                if (m->op == MFS_READ)
+                if (m->op == MFS_OP_READ)
                 {
-                    signal MoteFS.readInt(current_name, &buf_int);
+                    signal MoteFS.readInt(node->name, &buf_int);
                 }
                 else
                 {
-                    nx_int64_t val;
-                    val = unpack(m->data, "l", &val);
-                    signal MoteFS.writeInt(current_name, val);
+                    int64_t val;
+                    unpack(m->data, "l", &val);
+                    signal MoteFS.writeInt(node->name, val);
                 }
                 break;
 
             case MFS_STR:
-                if (m->op == MFS_READ)
+                if (m->op == MFS_OP_READ)
                 {
-                    signal MoteFS.readStr(current_name, buf_str);
+                    signal MoteFS.readStr(node->name, buf_str);
                 }
                 else
                 {
                     nxtostr(buf_str, m->data);
-                    signal MoteFS.writeStr(current_name, buf_str);
+                    signal MoteFS.writeStr(node->name, buf_str);
                 }
         }
         return msg;

@@ -15,14 +15,15 @@ module ExampleC
 implementation
 {
 
-    char teststr[MFS_DATA_SIZE];
+    char teststr[MFS_DATA_SIZE] = "Hello, world!";
 
     struct motefs_node nodes[] = {
-        {"led0", MFS_BOOL, MFS_READWRITE},
-        {"led1", MFS_BOOL, MFS_READWRITE},
-        {"led2", MFS_BOOL, MFS_READWRITE},
-        {"leds", MFS_INT, MFS_READWRITE},
-        {"test", MFS_STR, MFS_READWRITE},
+        {"led0", MFS_BOOL | MFS_RDWR},
+        {"led1", MFS_BOOL | MFS_RDWR},
+        {"led2", MFS_BOOL | MFS_RDWR},
+        {"leds", MFS_INT | MFS_RDWR},
+        {"test", MFS_STR | MFS_RDWR},
+        {"TOS_NODE_ID", MFS_INT | MFS_RDONLY},
     };
 
 
@@ -30,7 +31,7 @@ implementation
     {
         call Leds.led0On();
         call AMControl.start();
-        call MoteFS.init(nodes, sizeof nodes / sizeof nodes[0]);
+        call MoteFS.setNodes(nodes);
     }
 
     event void AMControl.startDone(error_t err)
@@ -83,6 +84,10 @@ implementation
         if (!strcmp(name, "leds"))
         {
             *val = call Leds.get();
+        }
+        else if (!strcmp(name, "TOS_NODE_ID"))
+        {
+            *val = TOS_NODE_ID;
         }
         else
         {

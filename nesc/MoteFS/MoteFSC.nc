@@ -21,8 +21,11 @@ implementation
 
     MoteFSP.Send = AMSend;
     MoteFSP.Receive = Receive;
+
 #ifdef LEDS
     components LedsC;
-    MoteFSP.Leds -> LedsC;
+#else
+    components NoLedsC as LedsC;
 #endif
+    MoteFSP.Leds->LedsC;
 }

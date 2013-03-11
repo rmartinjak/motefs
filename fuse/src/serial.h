@@ -1,7 +1,8 @@
 #ifndef SERIAL_H
 #define SERIAL_H
 
-int serial_connect(const char *dev, unsigned rate);
+int serial_connect_dev(const char *dev, unsigned rate);
+int serial_connect_sf(const char *host, unsigned port);
 
 void serial_lock(void);
 void serial_unlock(void);
