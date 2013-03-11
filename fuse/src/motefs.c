@@ -136,9 +136,7 @@ static int op_getattr(const char *path, struct stat *stbuf)
 
     stbuf->st_ino = n;
     stbuf->st_nlink = 1;
-    stbuf->st_atime =
-        stbuf->st_mtime =
-        stbuf->st_ctime = time(NULL);
+    stbuf->st_atime = stbuf->st_mtime = stbuf->st_ctime = time(NULL);
 
     stbuf->st_mode = S_IFREG;
     /* permission bits */
@@ -346,11 +344,13 @@ static struct fuse_operations motefs_ops = {
 };
 
 
-struct options {
+struct options
+{
     unsigned dev_rate;
     char *sf_host;
     unsigned sf_port;
-} options = { 115200, NULL, 9001 };
+};
+struct options options = { 115200, NULL, 9001 };
 
 #define OPT_KEY(t, p, v) { t, offsetof(struct options, p), v }
 static struct fuse_opt motefs_opts[] = {

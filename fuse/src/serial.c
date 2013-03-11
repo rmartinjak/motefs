@@ -15,7 +15,8 @@
 
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
-static enum { SRC_DEVICE, SRC_SF } src_type;
+static enum
+{ SRC_DEVICE, SRC_SF } src_type;
 static serial_source src_dev;
 static int src_fd;
 
@@ -32,6 +33,7 @@ static void debug_packet(uint8_t *packet)
     }
     fprintf(stderr, "\n");
 }
+
 #define DEBUG_PACKET(p) debug_packet(p)
 #else
 #define DEBUG_PACKET(p)
@@ -133,8 +135,8 @@ int serial_send(int node, int op, const uint8_t *data, int len)
     DEBUG_PACKET(buf);
 
     return (src_type == SRC_DEVICE) ?
-            write_serial_packet(src_dev, buf, sizeof buf) :
-            write_sf_packet(src_fd, buf, sizeof buf);
+        write_serial_packet(src_dev, buf, sizeof buf) :
+        write_sf_packet(src_fd, buf, sizeof buf);
 }
 
 int serial_receive(int *node, int *op, int *result, uint8_t *data, int len)
