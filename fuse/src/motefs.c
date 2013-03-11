@@ -235,7 +235,7 @@ static int op_read(const char *path, char *buf, size_t size, off_t offset,
     switch (MFS_TYPE(nodes[n].type))
     {
         case MFS_BOOL:
-            strcpy(buf, (*data) ? "true" : "false");
+            strcpy(buf, (*data) ? "1" : "0");
             break;
 
         case MFS_INT:
