@@ -151,15 +151,15 @@ static int op_getattr(const char *path, struct stat *stbuf)
     switch (MFS_TYPE(nodes[n].type))
     {
         case MFS_BOOL:
-            stbuf->st_size = 1;
+            stbuf->st_size = 2;
             break;
 
         case MFS_INT:
-            stbuf->st_size = sizeof(int64_t);
+            stbuf->st_size = snprintf(NULL, 0, "%" PRIi64 "\n", INT64_MIN);
             break;
 
         case MFS_STR:
-            stbuf->st_size = MFSMSG_SIZE;
+            stbuf->st_size = MFS_DATA_SIZE + 1;
             break;
     }
 
