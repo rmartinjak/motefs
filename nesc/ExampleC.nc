@@ -50,7 +50,7 @@ implementation
     {
     }
 
-    event void MoteFS.readBool(const char *name, bool * val)
+    event void MoteFS.readBool(uint8_t node, const char *name, bool * val)
     {
         uint8_t led = 0, current = call Leds.get();
         error_t res = SUCCESS;
@@ -77,7 +77,7 @@ implementation
         call MoteFS.readDone(res);
     }
 
-    event void MoteFS.readInt(const char *name, int64_t *val)
+    event void MoteFS.readInt(uint8_t node, const char *name, int64_t *val)
     {
         error_t res = SUCCESS;
 
@@ -97,7 +97,7 @@ implementation
         call MoteFS.readDone(res);
     }
 
-    event void MoteFS.readStr(const char *name, char val[MFS_DATA_SIZE])
+    event void MoteFS.readStr(uint8_t node, const char *name, char val[MFS_DATA_SIZE])
     {
         error_t res = SUCCESS;
 
@@ -114,7 +114,7 @@ implementation
     }
 
 
-    event void MoteFS.writeBool(const char *name, bool val)
+    event void MoteFS.writeBool(uint8_t node, const char *name, bool val)
     {
         uint8_t led = 0, current = call Leds.get();
         error_t res = SUCCESS;
@@ -150,7 +150,7 @@ implementation
         call MoteFS.writeDone(res);
     }
 
-    event void MoteFS.writeInt(const char *name, int64_t val)
+    event void MoteFS.writeInt(uint8_t node, const char *name, int64_t val)
     {
         error_t res = SUCCESS;
 
@@ -166,7 +166,7 @@ implementation
         call MoteFS.writeDone(res);
     }
 
-    event void MoteFS.writeStr(const char *name, char val[MFS_DATA_SIZE])
+    event void MoteFS.writeStr(uint8_t node, const char *name, char val[MFS_DATA_SIZE])
     {
         error_t res = SUCCESS;
 

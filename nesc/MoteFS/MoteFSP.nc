@@ -198,38 +198,38 @@ implementation
             case MFS_BOOL:
                 if (m->op == MFS_OP_READ)
                 {
-                    signal MoteFS.readBool(node->name, &buf_bool);
+                    signal MoteFS.readBool(m->node, node->name, &buf_bool);
                 }
                 else
                 {
                     uint8_t val;
                     unpack(m->data, "b", &val);
-                    signal MoteFS.writeBool(node->name, val);
+                    signal MoteFS.writeBool(m->node, node->name, val);
                 }
                 break;
 
             case MFS_INT:
                 if (m->op == MFS_OP_READ)
                 {
-                    signal MoteFS.readInt(node->name, &buf_int);
+                    signal MoteFS.readInt(m->node, node->name, &buf_int);
                 }
                 else
                 {
                     int64_t val;
                     unpack(m->data, "l", &val);
-                    signal MoteFS.writeInt(node->name, val);
+                    signal MoteFS.writeInt(m->node, node->name, val);
                 }
                 break;
 
             case MFS_STR:
                 if (m->op == MFS_OP_READ)
                 {
-                    signal MoteFS.readStr(node->name, buf_str);
+                    signal MoteFS.readStr(m->node, node->name, buf_str);
                 }
                 else
                 {
                     nxtostr(buf_str, m->data);
-                    signal MoteFS.writeStr(node->name, buf_str);
+                    signal MoteFS.writeStr(m->node, node->name, buf_str);
                 }
         }
         return msg;
