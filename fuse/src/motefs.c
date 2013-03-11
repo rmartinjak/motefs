@@ -292,7 +292,6 @@ static int op_write(const char *path, const char *buf, size_t size,
 
     if (nodes[n].type & MFS_BOOL)
     {
-        fprintf(stderr, "writing BOOL\n");
 #define MIN(a, b) (a < b) ? a : b
         if (!strncmp(line, "true", MIN(sizeof "true", len)))
             data[0] = 1;
@@ -306,14 +305,11 @@ static int op_write(const char *path, const char *buf, size_t size,
     else if (nodes[n].type & MFS_INT)
     {
         int64_t val = atoll(line);
-        fprintf(stderr, "writing INT\n");
-        fprintf(stderr, "%" PRIi64 "\n", val);
         len = pack(data, "l", val);
     }
     else if (nodes[n].type & MFS_STR)
     {
         unsigned i;
-        fprintf(stderr, "writing STR\n");
         for (i = 0; i < len; i++)
             data[i] = line[i];
         data[len] = '\0';
