@@ -17,6 +17,7 @@ implementation
 
     char teststr[MFS_DATA_SIZE] = "Hello, world!";
 
+    /* define the file system nodes */
     struct motefs_node nodes[] = {
         {"led0", MFS_BOOL | MFS_RDWR},
         {"led1", MFS_BOOL | MFS_RDWR},
@@ -31,6 +32,8 @@ implementation
     {
         call Leds.led0On();
         call AMControl.start();
+
+        /* let MoteFS know about the file system nodes */
         call MoteFS.setNodes(nodes);
     }
 
