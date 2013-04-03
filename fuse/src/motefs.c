@@ -75,6 +75,7 @@ static int fetch_nodelist(struct motefs_node *nodes)
         goto ret;
     }
 
+    /* the mote should send exactly `node_count` packets */
     for (i = 0; i < node_count; i++)
     {
         res = serial_receive(&n, &op, &result, buf, sizeof buf);
@@ -139,9 +140,14 @@ static int op_getattr(const char *path, struct stat *stbuf)
 
     stbuf->st_ino = n;
     stbuf->st_nlink = 1;
+
+    /* times aren't recorded, but current date and time looks better than
+     * 1970-01-01 00:00 */
     stbuf->st_atime = stbuf->st_mtime = stbuf->st_ctime = time(NULL);
 
+    /* all files are regular files */
     stbuf->st_mode = S_IFREG;
+
     /* permission bits */
     if (nodes[n].type & MFS_RDONLY)
         stbuf->st_mode |= 0444;
@@ -175,6 +181,7 @@ static int op_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 
     int i;
 
+    /* the root is the only valid directory */
     if (strcmp(path, "/"))
         return -ENOENT;
 
@@ -194,6 +201,7 @@ static int op_open(const char *path, struct fuse_file_info *fi)
 
     int n;
 
+    /* just check if `path` is valid */
     n = get_node(path);
     if (n == -1)
         return -ENOENT;
@@ -233,6 +241,7 @@ static int op_read(const char *path, char *buf, size_t size, off_t offset,
         goto ret;
     }
 
+    /* format reply */
     switch (MFS_TYPE(nodes[n].type))
     {
         case MFS_BOOL:
@@ -254,6 +263,7 @@ static int op_read(const char *path, char *buf, size_t size, off_t offset,
             break;
     }
 
+    /* add a newline because that looks better */
     strcat(buf, "\n");
     res = strlen(buf);
 
@@ -266,6 +276,7 @@ static int op_truncate(const char *path, off_t offset)
 {
     (void) path;
     (void) offset;
+    /* do nothing because we're not working with actual files */
     return 0;
 }
 
@@ -286,19 +297,22 @@ static int op_write(const char *path, const char *buf, size_t size,
     if (n == -1)
         return -ENOENT;
 
+    /* copy one line without '\n' to temporary buffer
+     * (and truncate it if too long) */
     for (i = 0; i < MFS_DATA_SIZE - 1 && i < size && buf[i] != '\n'; i++)
         line[i] = buf[i];
     line[i] = '\0';
     len = i;
 
+
+    /* convert the line to appropriate format which can be send as a serial
+     * packet */
     if (nodes[n].type & MFS_BOOL)
     {
-#define MIN(a, b) (a < b) ? a : b
-        if (!strncmp(line, "true", MIN(sizeof "true", len)))
+        if (!strcmp(line, "true"))
             data[0] = 1;
-        else if (!strncmp(line, "false", MIN(sizeof "false", len)))
+        else if (!strcmp(line, "false"))
             data[0] = 0;
-#undef MIN
         else
             data[0] = atoi(line) != 0;
         len = 1;
@@ -317,6 +331,7 @@ static int op_write(const char *path, const char *buf, size_t size,
     }
 
     serial_lock();
+
     if (serial_send(n, MFS_OP_WRITE, data, len))
     {
         res = -EIO;
@@ -336,6 +351,7 @@ static int op_write(const char *path, const char *buf, size_t size,
         return size;
     return res;
 }
+
 
 static struct fuse_operations motefs_ops = {
     .getattr = op_getattr,
