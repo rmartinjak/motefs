@@ -20,6 +20,13 @@
 #include "mfsmsg.h"
 #include "mfsconst.h"
 
+#define DEFAULT_RATE 11520
+#define DEFAULT_PORT 9001
+
+static char device[1024];
+static unsigned rate = DEFAULT_RATE, port = DEFAULT_PORT;
+
+
 #define MFS_MODE(x) ((x) & MFS_RDWR)
 #define MFS_TYPE(x) ((x) & (MFS_BOOL|MFS_INT|MFS_STR))
 
@@ -29,10 +36,6 @@ static struct motefs_node
     char name[MFS_DATA_SIZE];
     uint8_t type;
 } nodes[256];
-
-
-static char device[1024];
-
 
 static int fetch_nodecount(int *count)
 {
@@ -344,37 +347,33 @@ static struct fuse_operations motefs_ops = {
 };
 
 
-struct options
+static void set_device(const char *arg)
 {
-    unsigned dev_rate;
-    char *sf_host;
-    unsigned sf_port;
-};
-struct options options = { 115200, NULL, 9001 };
+    const char *p;
+    size_t n = sizeof device - 1;
 
-#define OPT_KEY(t, p, v) { t, offsetof(struct options, p), v }
-static struct fuse_opt motefs_opts[] = {
-    OPT_KEY("rate=%u", dev_rate, 0),
-    OPT_KEY("host=%s", sf_host, 0),
-    OPT_KEY("port=%u", sf_port, 0),
-    FUSE_OPT_END,
-};
+    p = strchr(arg, ':');
+    if (p)
+    {
+        n = p++ - arg;
+        rate = port = atoi(p);
+    }
+    strncpy(device, arg, n);
+}
 
 static int motefs_opt_proc(void *data, const char *arg, int key,
                            struct fuse_args *outargs)
 {
     (void) data;
     (void) outargs;
-    static bool dev_is_set = false;
 
     switch (key)
     {
         case FUSE_OPT_KEY_NONOPT:
             /* serial device (or sf host) is already set, pass the arg on to fuse */
-            if (options.sf_host || dev_is_set)
+            if (device[0])
                 return 1;
-            strncpy(device, arg, sizeof device - 1);
-            dev_is_set = true;
+            set_device(arg);
             return 0;
     }
     /* key unknown */
@@ -385,16 +384,18 @@ static int motefs_opt_proc(void *data, const char *arg, int key,
 int main(int argc, char **argv)
 {
     int res;
+    struct stat st;
     struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
 
-    if (fuse_opt_parse(&args, &options, motefs_opts, motefs_opt_proc) == -1)
+    if (fuse_opt_parse(&args, NULL, NULL, motefs_opt_proc) == -1)
         return EXIT_FAILURE;
 
-    if (!options.sf_host)
-        res = serial_connect_dev(device, options.dev_rate);
+    /* if `device` is not a file, treat it like the hostname of a serial
+     * forwarder */
+    if (lstat(device, &st) == -1 && errno == ENOENT)
+        res = serial_connect_sf(device, port);
     else
-        res = serial_connect_sf(options.sf_host, options.sf_port);
-    free(options.sf_host);
+        res = serial_connect_dev(device, rate);
 
     if (res)
         return EXIT_FAILURE;
