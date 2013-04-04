@@ -406,6 +406,13 @@ int main(int argc, char **argv)
     if (fuse_opt_parse(&args, NULL, NULL, motefs_opt_proc) == -1)
         return EXIT_FAILURE;
 
+    if (!device[0])
+    {
+        fprintf(stderr, "usage: %s path_or_host[:rate_or_port] mount_point\n",
+                argv[0]);
+        return EXIT_FAILURE;
+    }
+
     /* if `device` is not a file, treat it like the hostname of a serial
      * forwarder */
     if (lstat(device, &st) == -1 && errno == ENOENT)
